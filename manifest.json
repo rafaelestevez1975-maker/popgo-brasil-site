@@ -1,0 +1,42 @@
+{
+  "id": "https://www.popgobrasil.com/",
+  "name": "PopGo! Pipoca Gourmet",
+  "short_name": "PopGo!",
+  "description": "Microfranquia de pipoca gourmet em vending machine",
+  "start_url": "https://www.popgobrasil.com/",
+  "scope": "https://www.popgobrasil.com/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0d0d1f",
+  "theme_color": "#FF5E00",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Área Administrativa",
+      "short_name": "Admin",
+      "url": "https://www.popgobrasil.com/admin.html",
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Seja Franqueado",
+      "short_name": "Franquia",
+      "url": "https://www.popgobrasil.com/franquia.html",
+      "icons": [{ "src": "/assets/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["food", "business"]
+}
