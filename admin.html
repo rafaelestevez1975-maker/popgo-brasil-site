@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>PopGo! Admin</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet"/>
   <style>
     :root {
@@ -414,10 +415,12 @@
 
 <script>
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
-const PASS_HASH = 'ebfb42b40d432f37e19de65cfb633461f89d488fd5c4ac57b53ec88f3c116d71';
+const PASS_HASH   = 'ebfb42b40d432f37e19de65cfb633461f89d488fd5c4ac57b53ec88f3c116d71';
 const VALID_EMAIL = 'rafaelestevez1975@gmail.com';
+const SUPA_URL    = 'https://riutcbwillvqjrpaefkb.supabase.co';
 let allCandidatos = [];
 let chartInstances = {};
+let _passHash = null; // armazenado após login para chamadas às Edge Functions
 const COLORS = ['#FF5E00','#FFD700','#4da6ff','#2ecc71','#9b59b6','#e74c3c','#1abc9c','#f39c12'];
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
@@ -431,7 +434,9 @@ async function doLogin() {
   const pass  = document.getElementById('login-pass').value;
   const hash  = await sha256(pass);
   if (email === VALID_EMAIL && hash === PASS_HASH) {
+    _passHash = hash;
     sessionStorage.setItem('pg_auth','1');
+    sessionStorage.setItem('pg_hash', hash);
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     initApp();
@@ -485,9 +490,14 @@ async function loadCandidatos() {
   const tbody = document.getElementById('candidatos-tbody');
   tbody.innerHTML = '<tr class="loading-row"><td colspan="9"><div class="spinner"></div> Carregando candidatos...</td></tr>';
   try {
-    const res  = await fetch('/.netlify/functions/candidatos');
+    const hash = _passHash || sessionStorage.getItem('pg_hash');
+    const res  = await fetch(`${SUPA_URL}/functions/v1/popgo-candidatos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: VALID_EMAIL, passHash: hash })
+    });
     const data = await res.json();
-    allCandidatos = data.submissions || [];
+    allCandidatos = data.candidatos || [];
     renderCandidatos(allCandidatos);
     updateCandidatosKPIs(allCandidatos);
   } catch(e) {
@@ -509,18 +519,18 @@ function renderCandidatos(list) {
     return;
   }
   tbody.innerHTML = list.map((s,i) => {
-    const d = s.data || {};
-    const date   = new Date(s.created_at||Date.now()).toLocaleDateString('pt-BR');
-    const status = s._status || 'novo';
-    const badge  = `<span class="badge ${status}">${status}</span>`;
+    // Supabase retorna campos flat (sem wrapper .data)
+    const date  = new Date(s.created_at||Date.now()).toLocaleDateString('pt-BR');
+    const st    = s.status || 'novo';
+    const badge = `<span class="badge ${st}">${st}</span>`;
     return `<tr>
       <td style="color:var(--muted)">${i+1}</td>
-      <td><strong>${d.nome||'—'}</strong></td>
-      <td style="color:var(--muted)">${d.email||'—'}</td>
-      <td>${d.whatsapp||'—'}</td>
-      <td>${d.cidade||'—'}</td>
-      <td style="font-size:12px">${d.capital||'—'}</td>
-      <td style="font-size:12px">${d.ponto||'—'}</td>
+      <td><strong>${s.nome||'—'}</strong></td>
+      <td style="color:var(--muted)">${s.email||'—'}</td>
+      <td>${s.whatsapp||'—'}</td>
+      <td>${s.cidade||'—'}</td>
+      <td style="font-size:12px">${s.capital||'—'}</td>
+      <td style="font-size:12px">${s.ponto||'—'}</td>
       <td>${badge}</td>
       <td style="color:var(--muted);font-size:12px">${date}</td>
     </tr>`;
@@ -533,18 +543,18 @@ function updateCandidatosKPIs(list) {
   document.getElementById('c-new').textContent = list.filter(s=>new Date(s.created_at)>week).length;
 
   const caps = {};
-  list.forEach(s=>{ const c=(s.data||{}).capital; if(c){caps[c]=(caps[c]||0)+1;} });
+  list.forEach(s=>{ if(s.capital){caps[s.capital]=(caps[s.capital]||0)+1;} });
   const topCap = Object.entries(caps).sort((a,b)=>b[1]-a[1])[0];
   document.getElementById('c-capital').textContent = topCap ? topCap[0].replace('R$ ','R$') : '—';
 
   const cities = {};
-  list.forEach(s=>{ const c=(s.data||{}).cidade; if(c){cities[c]=(cities[c]||0)+1;} });
+  list.forEach(s=>{ if(s.cidade){cities[s.cidade]=(cities[s.cidade]||0)+1;} });
   const topCity = Object.entries(cities).sort((a,b)=>b[1]-a[1])[0];
   document.getElementById('c-top-city').textContent = topCity ? topCity[0].split(',')[0] : '—';
 
   const capitalLabels = ['Até R$50k','R$50k–R$80k','+R$80k','N/A'];
   const capitalData = capitalLabels.map(l => list.filter(s=>{
-    const c=(s.data||{}).capital||'';
+    const c = s.capital||'';
     if(l==='Até R$50k')   return c.includes('50.000') && c.includes('Até');
     if(l==='R$50k–R$80k') return c.includes('50.000 a');
     if(l==='+R$80k')      return c.includes('Acima');
@@ -570,18 +580,17 @@ function updateCandidatosKPIs(list) {
 }
 
 function filterTable(q) {
-  const filtered = allCandidatos.filter(s=>{
-    const d = s.data||{};
-    return [d.nome,d.email,d.cidade,d.whatsapp].some(v=>v&&v.toLowerCase().includes(q.toLowerCase()));
-  });
+  const filtered = allCandidatos.filter(s =>
+    [s.nome,s.email,s.cidade,s.whatsapp].some(v=>v&&v.toLowerCase().includes(q.toLowerCase()))
+  );
   renderCandidatos(filtered);
 }
 
 function exportCSV() {
-  const rows = [['#','Nome','Email','WhatsApp','Cidade','Capital','Ponto','Data']];
+  const rows = [['#','Nome','Email','WhatsApp','Cidade','Capital','Ponto','Status','Data']];
   allCandidatos.forEach((s,i)=>{
-    const d=s.data||{};
-    rows.push([i+1,d.nome,d.email,d.whatsapp,d.cidade,d.capital,d.ponto,new Date(s.created_at||'').toLocaleDateString('pt-BR')]);
+    rows.push([i+1,s.nome,s.email,s.whatsapp,s.cidade,s.capital,s.ponto,s.status,
+      new Date(s.created_at||'').toLocaleDateString('pt-BR')]);
   });
   const csv  = rows.map(r=>r.map(c=>'"'+(c||'').toString().replace(/"/g,'""')+'"').join(',')).join('\n');
   const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
@@ -909,10 +918,11 @@ async function toggleNotify() {
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
     });
-    await fetch('/.netlify/functions/subscribe', {
+    const hash = _passHash || sessionStorage.getItem('pg_hash');
+    await fetch(`${SUPA_URL}/functions/v1/popgo-subscribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sub)
+      body: JSON.stringify({ email: VALID_EMAIL, passHash: hash, action: 'subscribe', subscription: sub })
     });
     btn.textContent = '✅ Notificações ativas';
     btn.classList.add('active');
@@ -924,6 +934,9 @@ async function toggleNotify() {
 
 // Registra SW e atualiza estado do botão ao abrir o admin
 window.addEventListener('DOMContentLoaded', async () => {
+  if (sessionStorage.getItem('pg_auth') === '1') {
+    _passHash = sessionStorage.getItem('pg_hash');
+  }
   if ('serviceWorker' in navigator) {
     await navigator.serviceWorker.register('/sw.js');
     updateNotifyButton();
