@@ -1,4 +1,4 @@
-const CACHE = 'popgo-v2';
+const CACHE = 'popgo-v3';
 const STATIC = [
   '/',
   '/index.html',
@@ -42,28 +42,43 @@ self.addEventListener('fetch', e => {
 
 // ── PUSH NOTIFICATIONS ──────────────────────────────────────────────────────
 self.addEventListener('push', e => {
-  let data = { title: '🍿 PopGo!', body: 'Nova notificação', icon: '/assets/icon-192.png', url: '/admin.html' };
-  try { data = { ...data, ...JSON.parse(e.data.text()) }; } catch (_) {}
+  const defaults = {
+    title: '🍿 Novo Lead PopGo!',
+    body: 'Um novo candidato acabou de se cadastrar.',
+    icon: '/assets/icon-192.png',
+    badge: '/assets/icon-192.png',
+    url: '/admin.html'
+  };
+  let d = defaults;
+  try { d = { ...defaults, ...JSON.parse(e.data.text()) }; } catch (_) {}
 
   e.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: data.icon,
-      badge: '/assets/icon-192.png',
-      vibrate: [200, 100, 200],
-      data: { url: data.url },
-      actions: [{ action: 'open', title: 'Abrir Admin' }]
+    self.registration.showNotification(d.title, {
+      body: d.body,
+      icon: d.icon,
+      badge: d.badge,
+      image: d.image || undefined,
+      vibrate: [200, 100, 200, 100, 200],
+      tag: 'popgo-lead',          // agrupa notificações do mesmo tipo
+      renotify: true,             // vibra mesmo se já havia uma notificação igual
+      requireInteraction: true,   // fica na tela até o usuário tocar (Android)
+      data: { url: d.url },
+      actions: [
+        { action: 'open',    title: '👁 Ver lead' },
+        { action: 'dismiss', title: 'Fechar' }
+      ]
     })
   );
 });
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
+  if (e.action === 'dismiss') return;
   const url = (e.notification.data || {}).url || '/admin.html';
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      for (const client of list) {
-        if (client.url.includes(url) && 'focus' in client) return client.focus();
+      for (const c of list) {
+        if (c.url.includes('/admin') && 'focus' in c) return c.focus();
       }
       return clients.openWindow(url);
     })

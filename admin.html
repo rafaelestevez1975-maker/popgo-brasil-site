@@ -88,6 +88,41 @@
     .btn-notify.active{background:rgba(46,204,113,0.12);color:var(--green);border-color:var(--green);}
     .btn-notify.denied{background:rgba(231,76,60,0.08);color:var(--red);border-color:rgba(231,76,60,0.3);cursor:not-allowed;}
 
+    /* ── PUSH PROMPT BANNER ── */
+    .push-banner{
+      display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+      background:linear-gradient(135deg,#1a1a35,#252550);
+      border:1px solid rgba(255,215,0,0.35);border-radius:20px;
+      padding:20px 24px;max-width:420px;width:calc(100% - 32px);
+      box-shadow:0 16px 48px rgba(0,0,0,0.6);z-index:400;
+      animation:slideUp .35s ease;
+    }
+    .push-banner.show{display:flex;gap:16px;align-items:flex-start;}
+    @keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+    .push-banner-icon{font-size:32px;flex-shrink:0;line-height:1;}
+    .push-banner-body{flex:1;}
+    .push-banner-body h4{font-family:'Montserrat',sans-serif;font-size:14px;font-weight:900;margin-bottom:4px;color:var(--yellow);}
+    .push-banner-body p{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px;}
+    .push-banner-btns{display:flex;gap:8px;}
+    .btn-push-yes{
+      background:linear-gradient(135deg,var(--orange),#e04000);color:#fff;
+      border:none;border-radius:10px;padding:9px 18px;
+      font-family:'Montserrat',sans-serif;font-weight:900;font-size:13px;cursor:pointer;
+    }
+    .btn-push-no{
+      background:rgba(255,255,255,0.06);border:1px solid var(--border);
+      color:var(--muted);border-radius:10px;padding:9px 14px;
+      font-size:13px;font-weight:700;cursor:pointer;
+    }
+    .btn-push-no:hover{color:var(--text);}
+    .push-test-btn{
+      width:100%;background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.25);
+      color:rgba(46,204,113,0.7);padding:8px;border-radius:10px;
+      font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:6px;display:none;
+    }
+    .push-test-btn:hover{background:rgba(46,204,113,0.15);color:var(--green);}
+    .push-test-btn.show{display:block;}
+
     .main{margin-left:240px;padding:32px 36px;min-height:100vh;}
     .topbar-admin{
       display:flex;align-items:center;justify-content:space-between;
@@ -360,6 +395,7 @@
     </nav>
     <div class="sidebar-footer">
       <button class="btn-notify" id="btn-notify" onclick="toggleNotify()">🔔 Ativar notificações</button>
+      <button class="push-test-btn" id="btn-test-push" onclick="testPush()">🧪 Testar notificação</button>
       <button class="btn-logout" onclick="logout()">⎋ Sair</button>
     </div>
   </aside>
@@ -416,6 +452,19 @@
               <tr class="loading-row"><td colspan="8"><div class="spinner"></div> Carregando...</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── PUSH PROMPT BANNER ─── -->
+    <div class="push-banner" id="push-banner">
+      <div class="push-banner-icon">🍿</div>
+      <div class="push-banner-body">
+        <h4>Receba alertas de novos leads!</h4>
+        <p>Ative as notificações e seja avisado assim que alguém preencher o formulário de franquia.</p>
+        <div class="push-banner-btns">
+          <button class="btn-push-yes" onclick="activatePushFromBanner()">🔔 Ativar agora</button>
+          <button class="btn-push-no" onclick="dismissPushBanner()">Agora não</button>
         </div>
       </div>
     </div>
@@ -1222,6 +1271,7 @@ if(sessionStorage.getItem('pg_auth')==='1'){
 
 // ─── PUSH NOTIFICATIONS ──────────────────────────────────────────────────────
 const VAPID_PUBLIC = 'BOTPXf72u8mUFPTBP_Qy_KFWV8ForaXHbtK65AgcXQ76vUdhu1kNOiogP77CLS1ix_x_OoHFr4bne1Du6K8JCq8';
+const PUSH_BANNER_KEY = 'pg_push_dismissed';
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -1231,68 +1281,124 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 async function updateNotifyButton() {
-  const btn = document.getElementById('btn-notify');
+  const btn     = document.getElementById('btn-notify');
+  const testBtn = document.getElementById('btn-test-push');
   if (!btn) return;
+
   if (!('Notification' in window) || !('serviceWorker' in navigator)) {
     btn.textContent = '🔕 Push não suportado';
-    btn.classList.add('denied'); return;
+    btn.classList.add('denied');
+    return;
   }
-  const perm = Notification.permission;
-  if (perm === 'denied') {
+  if (Notification.permission === 'denied') {
     btn.textContent = '🚫 Notificações bloqueadas';
-    btn.classList.add('denied'); return;
+    btn.classList.add('denied');
+    return;
   }
   const reg = await navigator.serviceWorker.ready;
   const sub = await reg.pushManager.getSubscription();
   if (sub) {
     btn.textContent = '✅ Notificações ativas';
     btn.classList.add('active');
+    btn.classList.remove('denied');
+    if (testBtn) testBtn.classList.add('show');
   } else {
     btn.textContent = '🔔 Ativar notificações';
-    btn.classList.remove('active','denied');
+    btn.classList.remove('active', 'denied');
+    if (testBtn) testBtn.classList.remove('show');
+    // Mostra banner se não foi dispensado
+    if (!localStorage.getItem(PUSH_BANNER_KEY)) {
+      setTimeout(() => document.getElementById('push-banner')?.classList.add('show'), 1500);
+    }
   }
+}
+
+async function subscribePush() {
+  const reg  = await navigator.serviceWorker.ready;
+  const perm = Notification.permission === 'granted'
+    ? 'granted'
+    : await Notification.requestPermission();
+  if (perm !== 'granted') { updateNotifyButton(); return false; }
+
+  const sub  = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
+  });
+  const hash = _passHash || sessionStorage.getItem('pg_hash');
+  const res  = await fetch(`${SUPA_URL}/functions/v1/popgo-subscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: VALID_EMAIL, passHash: hash, action: 'subscribe', subscription: sub.toJSON() })
+  });
+  return res.ok;
 }
 
 async function toggleNotify() {
   const btn = document.getElementById('btn-notify');
   if (btn.classList.contains('denied')) return;
   try {
-    const reg = await navigator.serviceWorker.ready;
+    const reg      = await navigator.serviceWorker.ready;
     const existing = await reg.pushManager.getSubscription();
     if (existing) {
       await existing.unsubscribe();
-      btn.textContent = '🔔 Ativar notificações';
-      btn.classList.remove('active');
+      const hash = _passHash || sessionStorage.getItem('pg_hash');
+      await fetch(`${SUPA_URL}/functions/v1/popgo-subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: VALID_EMAIL, passHash: hash, action: 'unsubscribe' })
+      });
+      await updateNotifyButton();
       return;
     }
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') { updateNotifyButton(); return; }
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
-    });
-    const hash = _passHash || sessionStorage.getItem('pg_hash');
-    await fetch(`${SUPA_URL}/functions/v1/popgo-subscribe`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: VALID_EMAIL, passHash: hash, action: 'subscribe', subscription: sub })
-    });
-    btn.textContent = '✅ Notificações ativas';
-    btn.classList.add('active');
+    const ok = await subscribePush();
+    if (ok) await updateNotifyButton();
   } catch(e) {
-    console.error('Push subscribe error:', e);
+    console.error('Push toggle error:', e);
     updateNotifyButton();
   }
 }
 
-// Registra SW e atualiza estado do botão ao abrir o admin
+async function activatePushFromBanner() {
+  dismissPushBanner();
+  try {
+    const ok = await subscribePush();
+    if (ok) await updateNotifyButton();
+  } catch(e) {
+    console.error('Push banner error:', e);
+  }
+}
+
+function dismissPushBanner() {
+  document.getElementById('push-banner')?.classList.remove('show');
+  localStorage.setItem(PUSH_BANNER_KEY, '1');
+}
+
+async function testPush() {
+  const hash = _passHash || sessionStorage.getItem('pg_hash');
+  const btn  = document.getElementById('btn-test-push');
+  if (btn) { btn.textContent = '⏳ Enviando…'; btn.disabled = true; }
+  try {
+    const res  = await fetch(`${SUPA_URL}/functions/v1/popgo-notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Notify-Secret': 'popgo-push-2026' },
+      body: JSON.stringify({ nome: 'Teste', cidade: 'Sistema' })
+    });
+    const data = await res.json();
+    if (btn) { btn.textContent = data.ok ? '✅ Notificação enviada!' : '❌ Erro: ' + (data.error||'?'); }
+  } catch(e) {
+    if (btn) btn.textContent = '❌ Falha na conexão';
+  }
+  setTimeout(() => { if (btn) { btn.textContent = '🧪 Testar notificação'; btn.disabled = false; } }, 3000);
+}
+
+// Registra SW e inicializa
 window.addEventListener('DOMContentLoaded', async () => {
   if (sessionStorage.getItem('pg_auth') === '1') {
     _passHash = sessionStorage.getItem('pg_hash');
   }
   if ('serviceWorker' in navigator) {
     await navigator.serviceWorker.register('/sw.js');
-    updateNotifyButton();
+    if (sessionStorage.getItem('pg_auth') === '1') updateNotifyButton();
   }
 });
 </script>
