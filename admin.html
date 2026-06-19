@@ -124,7 +124,7 @@
 
     /* ── TABLE ── */
     .table-card{background:var(--card);border:1px solid var(--border);border-radius:20px;overflow:hidden;}
-    .table-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border);}
+    .table-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:12px;}
     .table-header h3{font-family:'Montserrat',sans-serif;font-size:15px;font-weight:900;}
     .table-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
     .search-input{
@@ -139,19 +139,109 @@
       font-size:13px;font-weight:700;cursor:pointer;
     }
     .btn-export:hover{background:rgba(255,215,0,0.25);}
+    /* filter tabs */
+    .filter-tabs{display:inline-flex;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;padding:3px;gap:3px;}
+    .filter-tab{
+      background:transparent;border:none;color:var(--muted);
+      padding:6px 14px;border-radius:8px;font-family:'Nunito',sans-serif;
+      font-size:12px;font-weight:800;cursor:pointer;transition:all .2s;
+    }
+    .filter-tab:hover{color:var(--text);}
+    .filter-tab.active{background:rgba(255,94,0,0.18);color:#fff;}
     table{width:100%;border-collapse:collapse;}
     th{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);padding:12px 24px;text-align:left;border-bottom:1px solid var(--border);}
     td{padding:14px 24px;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.04);}
     tr:last-child td{border-bottom:none;}
-    tr:hover td{background:rgba(255,255,255,0.03);}
-    .badge{display:inline-block;padding:3px 12px;border-radius:50px;font-size:11px;font-weight:800;}
-    .badge.novo{background:rgba(46,204,113,0.15);color:var(--green);}
-    .badge.contato{background:rgba(255,215,0,0.15);color:var(--yellow);}
-    .badge.qualificado{background:rgba(74,166,255,0.15);color:#4da6ff;}
-    .badge.fechado{background:rgba(255,94,0,0.15);color:var(--orange);}
+    tr.lead-row{cursor:pointer;}
+    tr.lead-row:hover td{background:rgba(255,94,0,0.06);}
+    .badge{display:inline-block;padding:3px 12px;border-radius:50px;font-size:11px;font-weight:800;white-space:nowrap;}
+    .badge.ativo{background:rgba(46,204,113,0.15);color:var(--green);}
+    .badge.conversando{background:rgba(255,215,0,0.15);color:var(--yellow);}
+    .badge.reunião-agendada,.badge.reuniao-agendada{background:rgba(74,166,255,0.15);color:#4da6ff;}
+    .badge.busca-de-ponto{background:rgba(155,89,182,0.18);color:#c39bd3;}
+    .badge.lead-quente{background:rgba(255,94,0,0.18);color:var(--orange);}
+    .badge.lead-morno{background:rgba(243,156,18,0.18);color:#f39c12;}
+    .badge.inativo{background:rgba(231,76,60,0.15);color:var(--red);}
     .empty-state{text-align:center;padding:60px 20px;color:var(--muted);}
     .empty-state .e-icon{font-size:3rem;margin-bottom:16px;}
     .empty-state p{font-size:15px;}
+
+    /* ── CRM MODAL ── */
+    .modal-overlay{
+      display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);
+      z-index:500;align-items:center;justify-content:center;padding:20px;
+    }
+    .modal-overlay.open{display:flex;}
+    .crm-modal{
+      background:#1a1a35;border:1px solid var(--border);border-radius:24px;
+      width:100%;max-width:560px;max-height:90vh;overflow-y:auto;
+      box-shadow:0 32px 80px rgba(0,0,0,0.7);
+    }
+    .crm-modal-header{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:24px 28px;border-bottom:1px solid var(--border);
+    }
+    .crm-modal-header h2{font-family:'Montserrat',sans-serif;font-size:17px;font-weight:900;}
+    .crm-close{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;padding:4px;}
+    .crm-close:hover{color:var(--text);}
+    .crm-modal-body{padding:28px;}
+    .crm-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;}
+    .crm-info-item label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:4px;}
+    .crm-info-item span{font-size:14px;font-weight:700;}
+    .crm-info-full{grid-column:1/-1;}
+    .crm-divider{border:none;border-top:1px solid var(--border);margin:0 0 24px;}
+    .crm-label{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:12px;}
+    .crm-status-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:20px;}
+    .crm-status-btn{
+      background:rgba(255,255,255,0.04);border:1px solid var(--border);
+      color:var(--muted);padding:10px 12px;border-radius:12px;
+      font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;
+      cursor:pointer;transition:all .2s;text-align:left;display:flex;align-items:center;gap:8px;
+    }
+    .crm-status-btn:hover{background:rgba(255,255,255,0.08);color:var(--text);}
+    .crm-status-btn.sel{border-width:2px;}
+    .crm-status-btn[data-s="ativo"].sel{background:rgba(46,204,113,0.12);border-color:var(--green);color:var(--green);}
+    .crm-status-btn[data-s="conversando"].sel{background:rgba(255,215,0,0.1);border-color:var(--yellow);color:var(--yellow);}
+    .crm-status-btn[data-s="reunião agendada"].sel{background:rgba(74,166,255,0.1);border-color:#4da6ff;color:#4da6ff;}
+    .crm-status-btn[data-s="busca de ponto"].sel{background:rgba(155,89,182,0.1);border-color:#9b59b6;color:#c39bd3;}
+    .crm-status-btn[data-s="lead quente"].sel{background:rgba(255,94,0,0.12);border-color:var(--orange);color:var(--orange);}
+    .crm-status-btn[data-s="lead morno"].sel{background:rgba(243,156,18,0.1);border-color:#f39c12;color:#f39c12;}
+    .crm-status-btn[data-s="inativo"].sel{background:rgba(231,76,60,0.1);border-color:var(--red);color:var(--red);}
+    .crm-notas{
+      width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);
+      border-radius:12px;padding:14px;color:var(--text);font-size:14px;
+      font-family:'Nunito',sans-serif;resize:vertical;min-height:90px;
+      transition:border .2s;margin-bottom:20px;
+    }
+    .crm-notas:focus{outline:none;border-color:var(--orange);}
+    .crm-notas-label{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+    .crm-notas-required{color:var(--red);font-size:11px;font-weight:700;display:none;}
+    .crm-history{
+      background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:12px;
+      padding:14px 16px;margin-bottom:16px;max-height:200px;overflow-y:auto;
+      font-size:13px;line-height:1.7;
+    }
+    .crm-history-entry{margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.06);}
+    .crm-history-entry:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
+    .crm-history-ts{font-size:11px;font-weight:800;color:var(--orange);letter-spacing:0.5px;display:block;margin-bottom:3px;}
+    .crm-history-text{color:var(--text);}
+    .crm-history-empty{color:var(--muted);font-size:13px;font-style:italic;}
+    .crm-footer{display:flex;gap:10px;justify-content:flex-end;}
+    .btn-crm-save{
+      background:linear-gradient(135deg,var(--orange),#e04000);color:#fff;
+      border:none;border-radius:12px;padding:12px 28px;
+      font-family:'Montserrat',sans-serif;font-weight:900;font-size:14px;
+      cursor:pointer;transition:all .2s;
+    }
+    .btn-crm-save:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(255,94,0,0.4);}
+    .btn-crm-save:disabled{opacity:.5;cursor:default;transform:none;box-shadow:none;}
+    .btn-crm-cancel{
+      background:rgba(255,255,255,0.06);border:1px solid var(--border);
+      color:var(--muted);padding:12px 20px;border-radius:12px;
+      font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;cursor:pointer;
+    }
+    .btn-crm-cancel:hover{color:var(--text);}
+    .crm-msg{font-size:13px;color:var(--green);margin-right:auto;display:none;}
 
     /* ── PERÍODO (Analytics) ── */
     .ga-section-title{font-family:'Montserrat',sans-serif;font-size:16px;font-weight:900;color:var(--text);margin:8px 0 16px;padding-top:8px;border-top:1px solid var(--border);}
@@ -177,11 +267,47 @@
     @keyframes spin{to{transform:rotate(360deg)}}
     .loading-row td{text-align:center;padding:40px;}
 
+    /* ── MOBILE NAV BAR ── */
+    .mobile-topbar{
+      display:none;position:fixed;top:0;left:0;right:0;height:56px;
+      background:#0a0a1a;border-bottom:1px solid var(--border);
+      z-index:200;align-items:center;padding:0 16px;gap:12px;
+    }
+    .mobile-topbar img{width:32px;height:32px;border-radius:50%;border:2px solid var(--orange);}
+    .mobile-topbar span{font-family:'Montserrat',sans-serif;font-weight:900;font-size:14px;color:var(--yellow);flex:1;}
+    .mobile-hamburger{
+      background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px;line-height:1;
+    }
+    .mobile-nav{
+      display:none;position:fixed;bottom:0;left:0;right:0;
+      background:#0a0a1a;border-top:1px solid var(--border);
+      z-index:200;flex-direction:row;
+    }
+    .mobile-nav-item{
+      flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      padding:10px 4px;font-size:10px;font-weight:800;color:var(--muted);
+      cursor:pointer;transition:color .2s;border-top:2px solid transparent;gap:4px;
+    }
+    .mobile-nav-item .icon{font-size:20px;}
+    .mobile-nav-item.active{color:var(--orange);border-top-color:var(--orange);}
+    .sidebar-overlay{
+      display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:150;
+    }
+    .sidebar-overlay.open{display:block;}
+
     /* ── RESPONSIVE ── */
     @media(max-width:900px){
-      .sidebar{transform:translateX(-100%);transition:.3s;}
+      .sidebar{transform:translateX(-100%);transition:.3s;z-index:160;}
       .sidebar.open{transform:none;}
-      .main{margin-left:0;}
+      .main{margin-left:0;padding:80px 16px 80px;}
+      .mobile-topbar{display:flex;}
+      .mobile-nav{display:flex;}
+      .kpi-grid{grid-template-columns:repeat(2,1fr);}
+      .table-actions{flex-direction:column;align-items:stretch;}
+      .search-input{width:100%;}
+      .crm-info-grid{grid-template-columns:1fr;}
+      .crm-status-grid{grid-template-columns:1fr;}
+      .crm-status-btn[data-s="inativo"]{grid-column:auto;}
     }
   </style>
 </head>
@@ -208,6 +334,14 @@
 
 <!-- ═══════════════ APP ═══════════════ -->
 <div id="app">
+  <!-- MOBILE TOP BAR -->
+  <div class="mobile-topbar" id="mobile-topbar">
+    <img src="assets/popgo-logo.jpg" alt="PopGo"/>
+    <span>PopGo! Admin</span>
+    <button class="mobile-hamburger" onclick="toggleSidebar()">☰</button>
+  </div>
+  <!-- SIDEBAR OVERLAY -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
@@ -240,9 +374,9 @@
     <!-- ─── CANDIDATOS ─── -->
     <div id="panel-candidatos">
       <div class="kpi-grid">
-        <div class="kpi-card orange"><div class="kpi-icon">📋</div><div class="kpi-val" id="c-total">0</div><div class="kpi-label">Total de Candidatos</div></div>
-        <div class="kpi-card green"><div class="kpi-icon">🆕</div><div class="kpi-val" id="c-new">0</div><div class="kpi-label">Esta Semana</div></div>
-        <div class="kpi-card yellow"><div class="kpi-icon">💰</div><div class="kpi-val" id="c-capital">—</div><div class="kpi-label">Capital Mais Comum</div></div>
+        <div class="kpi-card orange"><div class="kpi-icon">📋</div><div class="kpi-val" id="c-total">0</div><div class="kpi-label">Total de Leads</div></div>
+        <div class="kpi-card green"><div class="kpi-icon">✅</div><div class="kpi-val" id="c-ativos">0</div><div class="kpi-label">Leads Ativos</div></div>
+        <div class="kpi-card yellow"><div class="kpi-icon">🔥</div><div class="kpi-val" id="c-quentes">0</div><div class="kpi-label">Quentes / Reunião</div></div>
         <div class="kpi-card blue"><div class="kpi-icon">📍</div><div class="kpi-val" id="c-top-city">—</div><div class="kpi-label">Cidade Mais Frequente</div></div>
       </div>
       <div class="chart-card" style="margin-bottom:24px">
@@ -252,8 +386,13 @@
       </div>
       <div class="table-card">
         <div class="table-header">
-          <h3>Lista de Candidatos</h3>
+          <h3>Lista de Leads</h3>
           <div class="table-actions">
+            <div class="filter-tabs">
+              <button class="filter-tab active" data-filter="ativos" onclick="setFilter('ativos',this)">🟢 Ativos</button>
+              <button class="filter-tab" data-filter="inativos" onclick="setFilter('inativos',this)">🔴 Inativos</button>
+              <button class="filter-tab" data-filter="todos" onclick="setFilter('todos',this)">Todos</button>
+            </div>
             <input type="text" class="search-input" placeholder="🔍 Buscar candidato..." oninput="filterTable(this.value)"/>
             <button class="btn-export" onclick="exportCSV()">⬇ Exportar CSV</button>
             <button class="btn-export" style="background:rgba(46,204,113,0.15);border-color:rgba(46,204,113,0.3);color:var(--green);" onclick="loadCandidatos()">↻ Atualizar</button>
@@ -265,19 +404,72 @@
               <tr>
                 <th>#</th>
                 <th>Nome</th>
-                <th>E-mail</th>
                 <th>WhatsApp</th>
                 <th>Cidade</th>
                 <th>Capital</th>
-                <th>Ponto</th>
-                <th>Status</th>
+                <th>Status CRM</th>
                 <th>Data</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="candidatos-tbody">
-              <tr class="loading-row"><td colspan="9"><div class="spinner"></div> Carregando...</td></tr>
+              <tr class="loading-row"><td colspan="8"><div class="spinner"></div> Carregando...</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── MOBILE BOTTOM NAV ─── -->
+    <nav class="mobile-nav" id="mobile-nav">
+      <div class="mobile-nav-item active" id="mnav-candidatos" onclick="showPanel('candidatos');setMobileNav('candidatos')">
+        <span class="icon">🍿</span>Leads
+      </div>
+      <div class="mobile-nav-item" id="mnav-analytics" onclick="showPanel('analytics');setMobileNav('analytics')">
+        <span class="icon">📊</span>Analytics
+      </div>
+      <div class="mobile-nav-item" onclick="window.open('/','_blank')">
+        <span class="icon">🌐</span>Site
+      </div>
+      <div class="mobile-nav-item" onclick="logout()">
+        <span class="icon">⎋</span>Sair
+      </div>
+    </nav>
+
+    <!-- ─── CRM MODAL ─── -->
+    <div class="modal-overlay" id="crm-modal" onclick="if(event.target===this)closeCRM()">
+      <div class="crm-modal">
+        <div class="crm-modal-header">
+          <h2 id="crm-nome-title">Lead</h2>
+          <button class="crm-close" onclick="closeCRM()">✕</button>
+        </div>
+        <div class="crm-modal-body">
+          <div class="crm-info-grid" id="crm-info-grid"></div>
+          <hr class="crm-divider"/>
+          <span class="crm-label">🎯 Andamento no Funil de Vendas</span>
+          <div class="crm-status-grid">
+            <button class="crm-status-btn" data-s="ativo"            onclick="selectCrmStatus(this)">🟢 Ativo</button>
+            <button class="crm-status-btn" data-s="conversando"      onclick="selectCrmStatus(this)">💬 Conversando</button>
+            <button class="crm-status-btn" data-s="reunião agendada" onclick="selectCrmStatus(this)">📅 Reunião Agendada</button>
+            <button class="crm-status-btn" data-s="busca de ponto"   onclick="selectCrmStatus(this)">📍 Busca de Ponto</button>
+            <button class="crm-status-btn" data-s="lead quente"      onclick="selectCrmStatus(this)">🔥 Lead Quente</button>
+            <button class="crm-status-btn" data-s="lead morno"       onclick="selectCrmStatus(this)">🌡️ Lead Morno</button>
+            <button class="crm-status-btn" data-s="inativo" style="grid-column:1/-1" onclick="selectCrmStatus(this)">❌ Inativo</button>
+          </div>
+          <span class="crm-label">📋 Histórico de Anotações</span>
+          <div class="crm-history" id="crm-history">
+            <span class="crm-history-empty">Nenhuma anotação ainda.</span>
+          </div>
+          <div class="crm-notas-label">
+            <span class="crm-label" style="margin:0">✏️ Nova anotação</span>
+            <span class="crm-notas-required" id="crm-notas-required">* Obrigatório ao marcar como Inativo</span>
+          </div>
+          <textarea class="crm-notas" id="crm-notas" placeholder="Digite uma nova anotação sobre este lead…" rows="3"></textarea>
+          <div class="crm-footer">
+            <span class="crm-msg" id="crm-msg">✅ Salvo com sucesso!</span>
+            <button class="btn-crm-cancel" onclick="closeCRM()">Cancelar</button>
+            <button class="btn-crm-save" id="crm-save-btn" onclick="saveCRM()">Salvar</button>
+          </div>
         </div>
       </div>
     </div>
@@ -418,10 +610,28 @@
 const PASS_HASH   = 'ebfb42b40d432f37e19de65cfb633461f89d488fd5c4ac57b53ec88f3c116d71';
 const VALID_EMAIL = 'rafaelestevez1975@gmail.com';
 const SUPA_URL    = 'https://riutcbwillvqjrpaefkb.supabase.co';
+const SUPA_ANON   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpdXRjYndpbGx2cWpycGFlZmtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NDk0MzksImV4cCI6MjA5MDMyNTQzOX0.WR69xD-_dvkG7dN2EkwerPw0Su8vcStNgnha8Ky0grA';
 let allCandidatos = [];
 let chartInstances = {};
-let _passHash = null; // armazenado após login para chamadas às Edge Functions
+let _passHash = null;
+let activeFilter = 'ativos';
+let searchQuery  = '';
 const COLORS = ['#FF5E00','#FFD700','#4da6ff','#2ecc71','#9b59b6','#e74c3c','#1abc9c','#f39c12'];
+
+const CRM_INACTIVE = 'inativo';
+const CRM_ATIVOS = ['ativo','conversando','reunião agendada','busca de ponto','lead quente','lead morno'];
+
+function badgeClass(s) {
+  return (s||'ativo').toLowerCase().replace(/\s+/g,'-').replace(/ã/g,'a').replace(/é/g,'e');
+}
+function badgeLabel(s) {
+  const map = {
+    'ativo':'🟢 Ativo','conversando':'💬 Conversando','reunião agendada':'📅 Reunião Agendada',
+    'busca de ponto':'📍 Busca de Ponto','lead quente':'🔥 Lead Quente',
+    'lead morno':'🌡️ Lead Morno','inativo':'❌ Inativo'
+  };
+  return map[s||'ativo'] || s;
+}
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 async function sha256(msg) {
@@ -463,22 +673,27 @@ function initApp() {
 let analyticsLoaded = false;
 
 function showPanel(name) {
-  // Estado ativo no menu
+  // Sidebar desktop
   document.querySelectorAll('.nav-item[data-panel]').forEach(n =>
     n.classList.toggle('active', n.dataset.panel === name));
 
-  // Mostra/esconde painéis
+  // Mobile bottom nav
+  document.querySelectorAll('.mobile-nav-item[id^="mnav-"]').forEach(el =>
+    el.classList.toggle('active', el.id === 'mnav-' + name));
+  closeSidebar();
+
+  // Painéis
   const panels = { candidatos: 'panel-candidatos', analytics: 'panel-analytics' };
   Object.entries(panels).forEach(([key, id]) => {
     const el = document.getElementById(id);
     if (el) el.style.display = (key === name) ? 'block' : 'none';
   });
 
-  // Título da topbar
+  // Título
   document.getElementById('panel-title').textContent =
     name === 'analytics' ? 'Visitas & Analytics' : 'Candidatos a Franquia';
 
-  // Carrega Analytics sob demanda (só na primeira abertura)
+  // Analytics sob demanda
   if (name === 'analytics' && !analyticsLoaded) {
     analyticsLoaded = true;
     loadAnalytics();
@@ -488,7 +703,7 @@ function showPanel(name) {
 // ─── CANDIDATOS ───────────────────────────────────────────────────────────────
 async function loadCandidatos() {
   const tbody = document.getElementById('candidatos-tbody');
-  tbody.innerHTML = '<tr class="loading-row"><td colspan="9"><div class="spinner"></div> Carregando candidatos...</td></tr>';
+  tbody.innerHTML = '<tr class="loading-row"><td colspan="8"><div class="spinner"></div> Carregando candidatos...</td></tr>';
   try {
     const hash = _passHash || sessionStorage.getItem('pg_hash');
     const res  = await fetch(`${SUPA_URL}/functions/v1/popgo-candidatos`, {
@@ -498,10 +713,10 @@ async function loadCandidatos() {
     });
     const data = await res.json();
     allCandidatos = data.candidatos || [];
-    renderCandidatos(allCandidatos);
+    applyFilters();
     updateCandidatosKPIs(allCandidatos);
   } catch(e) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">
       <div class="empty-state">
         <div class="e-icon">🍿</div>
         <p>Nenhum candidato ainda — assim que alguém preencher o formulário aparece aqui automaticamente.</p>
@@ -510,42 +725,53 @@ async function loadCandidatos() {
   }
 }
 
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-tab').forEach(b => b.classList.toggle('active', b === btn));
+  applyFilters();
+}
+
+function applyFilters() {
+  let list = allCandidatos;
+  if (activeFilter === 'ativos')   list = list.filter(s => CRM_ATIVOS.includes(s.status || 'ativo'));
+  if (activeFilter === 'inativos') list = list.filter(s => s.status === CRM_INACTIVE);
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    list = list.filter(s => [s.nome,s.email,s.cidade,s.whatsapp].some(v=>v&&v.toLowerCase().includes(q)));
+  }
+  renderCandidatos(list);
+}
+
 function renderCandidatos(list) {
   const tbody = document.getElementById('candidatos-tbody');
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="9">
+    tbody.innerHTML = `<tr><td colspan="8">
       <div class="empty-state"><div class="e-icon">🍿</div>
-      <p>Nenhum candidato ainda. Compartilhe a landing page!</p></div></td></tr>`;
+      <p>${activeFilter==='inativos'?'Nenhum lead inativo.':activeFilter==='ativos'?'Nenhum lead ativo no momento.':'Nenhum candidato ainda. Compartilhe a landing page!'}</p>
+      </div></td></tr>`;
     return;
   }
   tbody.innerHTML = list.map((s,i) => {
-    // Supabase retorna campos flat (sem wrapper .data)
     const date  = new Date(s.created_at||Date.now()).toLocaleDateString('pt-BR');
-    const st    = s.status || 'novo';
-    const badge = `<span class="badge ${st}">${st}</span>`;
-    return `<tr>
+    const st    = s.status || 'ativo';
+    const badge = `<span class="badge ${badgeClass(st)}">${badgeLabel(st)}</span>`;
+    return `<tr class="lead-row" onclick="openCRM('${s.id}')">
       <td style="color:var(--muted)">${i+1}</td>
-      <td><strong>${s.nome||'—'}</strong></td>
-      <td style="color:var(--muted)">${s.email||'—'}</td>
+      <td><strong>${s.nome||'—'}</strong><br><span style="font-size:12px;color:var(--muted)">${s.email||''}</span></td>
       <td>${s.whatsapp||'—'}</td>
       <td>${s.cidade||'—'}</td>
       <td style="font-size:12px">${s.capital||'—'}</td>
-      <td style="font-size:12px">${s.ponto||'—'}</td>
       <td>${badge}</td>
       <td style="color:var(--muted);font-size:12px">${date}</td>
+      <td style="color:var(--muted);font-size:18px">›</td>
     </tr>`;
   }).join('');
 }
 
 function updateCandidatosKPIs(list) {
   document.getElementById('c-total').textContent = list.length;
-  const week = new Date(); week.setDate(week.getDate()-7);
-  document.getElementById('c-new').textContent = list.filter(s=>new Date(s.created_at)>week).length;
-
-  const caps = {};
-  list.forEach(s=>{ if(s.capital){caps[s.capital]=(caps[s.capital]||0)+1;} });
-  const topCap = Object.entries(caps).sort((a,b)=>b[1]-a[1])[0];
-  document.getElementById('c-capital').textContent = topCap ? topCap[0].replace('R$ ','R$') : '—';
+  document.getElementById('c-ativos').textContent = list.filter(s=>CRM_ATIVOS.includes(s.status||'ativo')).length;
+  document.getElementById('c-quentes').textContent = list.filter(s=>['lead quente','reunião agendada'].includes(s.status)).length;
 
   const cities = {};
   list.forEach(s=>{ if(s.cidade){cities[s.cidade]=(cities[s.cidade]||0)+1;} });
@@ -580,16 +806,133 @@ function updateCandidatosKPIs(list) {
 }
 
 function filterTable(q) {
-  const filtered = allCandidatos.filter(s =>
-    [s.nome,s.email,s.cidade,s.whatsapp].some(v=>v&&v.toLowerCase().includes(q.toLowerCase()))
-  );
-  renderCandidatos(filtered);
+  searchQuery = q;
+  applyFilters();
+}
+
+// ─── CRM MODAL ────────────────────────────────────────────────────────────────
+let crmLeadId = null;
+let crmStatus = 'ativo';
+
+function openCRM(id) {
+  const s = allCandidatos.find(c => c.id === id);
+  if (!s) return;
+  crmLeadId = id;
+  crmStatus  = s.status || 'ativo';
+
+  document.getElementById('crm-nome-title').textContent = s.nome || 'Lead';
+  document.getElementById('crm-notas').value = '';
+  document.getElementById('crm-msg').style.display = 'none';
+  document.getElementById('crm-notas-required').style.display = 'none';
+  renderCrmHistory(s.notas || '');
+
+  // info grid
+  document.getElementById('crm-info-grid').innerHTML = `
+    <div class="crm-info-item"><label>E-mail</label><span>${s.email||'—'}</span></div>
+    <div class="crm-info-item"><label>WhatsApp</label><span>${s.whatsapp||'—'}</span></div>
+    <div class="crm-info-item"><label>Cidade</label><span>${s.cidade||'—'}</span></div>
+    <div class="crm-info-item"><label>Capital</label><span>${s.capital||'—'}</span></div>
+    <div class="crm-info-item crm-info-full"><label>Tem ponto?</label><span>${s.ponto||'—'}</span></div>
+    ${s.mensagem ? `<div class="crm-info-item crm-info-full"><label>Mensagem</label><span style="font-weight:400;font-size:13px">${s.mensagem}</span></div>` : ''}
+  `;
+
+  // status buttons
+  document.querySelectorAll('.crm-status-btn').forEach(btn => {
+    btn.classList.toggle('sel', btn.dataset.s === crmStatus);
+  });
+
+  document.getElementById('crm-modal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeCRM() {
+  document.getElementById('crm-modal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function selectCrmStatus(btn) {
+  crmStatus = btn.dataset.s;
+  document.querySelectorAll('.crm-status-btn').forEach(b => b.classList.toggle('sel', b === btn));
+  const req = document.getElementById('crm-notas-required');
+  req.style.display = crmStatus === CRM_INACTIVE ? 'inline' : 'none';
+}
+
+function renderCrmHistory(notasText) {
+  const el = document.getElementById('crm-history');
+  if (!notasText || !notasText.trim()) {
+    el.innerHTML = '<span class="crm-history-empty">Nenhuma anotação ainda.</span>';
+    return;
+  }
+  // Each entry starts with a timestamp line: [DD/MM/YYYY HH:mm]
+  const entries = notasText.split(/(?=\[\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}\])/).filter(e => e.trim());
+  if (!entries.length) {
+    // Legacy plain text — show as single entry without timestamp header
+    el.innerHTML = `<div class="crm-history-entry"><span class="crm-history-text">${notasText.replace(/\n/g,'<br>')}</span></div>`;
+    return;
+  }
+  el.innerHTML = entries.reverse().map(entry => {
+    const tsMatch = entry.match(/^\[(\d{2}\/\d{2}\/\d{4} \d{2}:\d{2})\]\s*/);
+    if (tsMatch) {
+      const ts   = tsMatch[1];
+      const text = entry.slice(tsMatch[0].length).trim().replace(/\n/g,'<br>');
+      return `<div class="crm-history-entry"><span class="crm-history-ts">${ts}</span><span class="crm-history-text">${text}</span></div>`;
+    }
+    return `<div class="crm-history-entry"><span class="crm-history-text">${entry.trim().replace(/\n/g,'<br>')}</span></div>`;
+  }).join('');
+  el.scrollTop = 0;
+}
+
+function nowBR() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+async function saveCRM() {
+  const newNote = document.getElementById('crm-notas').value.trim();
+  if (crmStatus === CRM_INACTIVE && !newNote) {
+    document.getElementById('crm-notas-required').style.display = 'inline';
+    document.getElementById('crm-notas').focus();
+    return;
+  }
+  const btn = document.getElementById('crm-save-btn');
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  try {
+    // Build updated notes: prepend new entry with timestamp to existing history
+    const lead = allCandidatos.find(c => c.id === crmLeadId);
+    const existing = (lead && lead.notas) ? lead.notas : '';
+    const notas = newNote
+      ? `[${nowBR()}] ${newNote}\n${existing}`.trim()
+      : existing;
+
+    const res = await fetch(`${SUPA_URL}/rest/v1/popgo_candidatos?id=eq.${crmLeadId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPA_ANON,
+        'Authorization': `Bearer ${SUPA_ANON}`,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ status: crmStatus, notas })
+    });
+    if (!res.ok) throw new Error(res.status);
+    const idx = allCandidatos.findIndex(c => c.id === crmLeadId);
+    if (idx >= 0) { allCandidatos[idx].status = crmStatus; allCandidatos[idx].notas = notas; }
+    const msg = document.getElementById('crm-msg');
+    msg.style.display = 'inline';
+    btn.textContent = 'Salvo ✓';
+    applyFilters();
+    setTimeout(() => { msg.style.display='none'; btn.disabled=false; btn.textContent='Salvar'; closeCRM(); }, 1200);
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Salvar';
+    alert('Erro ao salvar. Tente novamente.');
+  }
 }
 
 function exportCSV() {
-  const rows = [['#','Nome','Email','WhatsApp','Cidade','Capital','Ponto','Status','Data']];
+  const rows = [['#','Nome','Email','WhatsApp','Cidade','Capital','Ponto','Status CRM','Notas','Data']];
   allCandidatos.forEach((s,i)=>{
-    rows.push([i+1,s.nome,s.email,s.whatsapp,s.cidade,s.capital,s.ponto,s.status,
+    rows.push([i+1,s.nome,s.email,s.whatsapp,s.cidade,s.capital,s.ponto,s.status,s.notas||'',
       new Date(s.created_at||'').toLocaleDateString('pt-BR')]);
   });
   const csv  = rows.map(r=>r.map(c=>'"'+(c||'').toString().replace(/"/g,'""')+'"').join(',')).join('\n');
@@ -858,6 +1201,16 @@ function renderGaOS(rows) {
     options:{ responsive:true, maintainAspectRatio:false, cutout:'60%',
       plugins:{ legend:{ position:'right', labels:{ color:'#ccc', usePointStyle:true, boxWidth:8, font:{size:11} } } } }
   });
+}
+
+// ─── MOBILE NAV ──────────────────────────────────────────────────────────────
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
 }
 
 // ─── BOOT ────────────────────────────────────────────────────────────────────
