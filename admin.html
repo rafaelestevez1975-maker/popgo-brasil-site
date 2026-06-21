@@ -954,17 +954,14 @@ async function saveCRM() {
       ? `[${nowBR()}] ${newNote}\n${existing}`.trim()
       : existing;
 
-    const res = await fetch(`${SUPA_URL}/rest/v1/popgo_candidatos?id=eq.${crmLeadId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPA_ANON,
-        'Authorization': `Bearer ${SUPA_ANON}`,
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({ status: crmStatus, notas })
+    const hash = _passHash || sessionStorage.getItem('pg_hash');
+    const res = await fetch(`${SUPA_URL}/functions/v1/popgo-candidatos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: VALID_EMAIL, passHash: hash, action: 'update', id: crmLeadId, status: crmStatus, notas })
     });
-    if (!res.ok) throw new Error(res.status);
+    const result = await res.json();
+    if (!res.ok || result.error) throw new Error(result.error || res.status);
     const idx = allCandidatos.findIndex(c => c.id === crmLeadId);
     if (idx >= 0) { allCandidatos[idx].status = crmStatus; allCandidatos[idx].notas = notas; }
     const msg = document.getElementById('crm-msg');
