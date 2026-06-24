@@ -1,51 +1,80 @@
 /**
  * ga4.js — Netlify Serverless Function
- * Consulta a GA4 Data API usando OAuth2 Refresh Token
+ * Consulta a GA4 Data API.
  *
- * Variáveis de ambiente necessárias no Netlify:
- *   GA4_CLIENT_ID      → OAuth2 Client ID
- *   GA4_CLIENT_SECRET  → OAuth2 Client Secret
- *   GA4_REFRESH_TOKEN  → OAuth2 Refresh Token
- *   GA4_PROPERTY_ID    → ID numérico da propriedade GA4 (ex: 540434072)
+ * Autenticação em ordem de prioridade:
+ *   1. Service Account (recomendado — sem expiração)
+ *      GA4_SA_EMAIL        → e-mail da service account
+ *      GA4_SA_PRIVATE_KEY  → chave privada (conteúdo completo do campo "private_key" do JSON)
+ *
+ *   2. OAuth2 Refresh Token (fallback)
+ *      GA4_CLIENT_ID / GA4_CLIENT_SECRET / GA4_REFRESH_TOKEN
+ *
+ *   Sempre necessário:
+ *      GA4_PROPERTY_ID → ID numérico da propriedade GA4
  */
 
+const crypto    = require('crypto');
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GA4_URL   = 'https://analyticsdata.googleapis.com/v1beta';
+const GA4_SCOPE = 'https://www.googleapis.com/auth/analytics.readonly';
+
+// ── Service Account JWT ────────────────────────────────────────────────────────
+async function getServiceAccountToken(email, privateKey) {
+  const now = Math.floor(Date.now() / 1000);
+  const b64  = s => Buffer.from(s).toString('base64url');
+  const header  = b64(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const payload = b64(JSON.stringify({
+    iss: email, scope: GA4_SCOPE,
+    aud: TOKEN_URL, exp: now + 3600, iat: now
+  }));
+  const sigInput = `${header}.${payload}`;
+  // A chave pode vir com \n literal ou com quebras reais
+  const key = privateKey.replace(/\\n/g, '\n');
+  const sig  = crypto.createSign('RSA-SHA256').update(sigInput).sign(key, 'base64url');
+  const jwt  = `${sigInput}.${sig}`;
+
+  const res  = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt
+    })
+  });
+  const data = await res.json();
+  if (!data.access_token) throw new Error('SA token error: ' + JSON.stringify(data));
+  return data.access_token;
+}
 
 // ── OAuth2 Refresh Token ───────────────────────────────────────────────────────
-async function getToken(clientId, clientSecret, refreshToken) {
+async function getRefreshToken(clientId, clientSecret, refreshToken) {
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'refresh_token',
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken
-    }).toString()
+      client_id: clientId, client_secret: clientSecret, refresh_token: refreshToken
+    })
   });
   const data = await res.json();
   if (!data.access_token) throw new Error('Token error: ' + JSON.stringify(data));
   return data.access_token;
 }
 
-// ── GA4 API calls ─────────────────────────────────────────────────────────────
+// ── GA4 API ────────────────────────────────────────────────────────────────────
 async function batchRun(token, propId, requests) {
   const res = await fetch(`${GA4_URL}/properties/${propId}:batchRunReports`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ requests })
   });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`GA4 API ${res.status}: ${err}`);
-  }
+  if (!res.ok) throw new Error(`GA4 API ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
-// ── Row parser ─────────────────────────────────────────────────────────────────
 function rows(report) {
-  if (!report || !report.rows) return [];
+  if (!report?.rows) return [];
   return report.rows.map(r => ({
     dim:  (r.dimensionValues || []).map(d => d.value),
     vals: (r.metricValues   || []).map(m => parseFloat(m.value || 0))
@@ -58,140 +87,95 @@ exports.handler = async (event) => {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Cache-Control': 'public, max-age=900' // cache 15 min
+    'Cache-Control': 'public, max-age=900'
   };
 
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
 
-  // Verifica configuração
-  const clientId     = process.env.GA4_CLIENT_ID;
-  const clientSecret = process.env.GA4_CLIENT_SECRET;
-  const refreshToken = process.env.GA4_REFRESH_TOKEN;
-  const propertyId   = process.env.GA4_PROPERTY_ID;
-
-  if (!clientId || !clientSecret || !refreshToken || !propertyId) {
-    return {
-      statusCode: 200, headers,
-      body: JSON.stringify({
-        status: 'GA4_NOT_CONFIGURED',
-        message: 'Adicione GA4_CLIENT_ID, GA4_CLIENT_SECRET, GA4_REFRESH_TOKEN e GA4_PROPERTY_ID nas Environment Variables do Netlify.'
-      })
-    };
+  const propertyId = process.env.GA4_PROPERTY_ID;
+  if (!propertyId) {
+    return { statusCode: 200, headers, body: JSON.stringify({ status: 'GA4_NOT_CONFIGURED', message: 'GA4_PROPERTY_ID não definido.' }) };
   }
 
   try {
-    const token = await getToken(clientId, clientSecret, refreshToken);
+    // Tenta Service Account primeiro, depois refresh token
+    let token;
+    const saEmail = process.env.GA4_SA_EMAIL;
+    const saKey   = process.env.GA4_SA_PRIVATE_KEY;
+
+    if (saEmail && saKey) {
+      token = await getServiceAccountToken(saEmail, saKey);
+    } else {
+      const clientId     = process.env.GA4_CLIENT_ID;
+      const clientSecret = process.env.GA4_CLIENT_SECRET;
+      const refreshToken = process.env.GA4_REFRESH_TOKEN;
+      if (!clientId || !clientSecret || !refreshToken) {
+        return { statusCode: 200, headers, body: JSON.stringify({ status: 'GA4_NOT_CONFIGURED', message: 'Configure GA4_SA_EMAIL + GA4_SA_PRIVATE_KEY (recomendado) ou GA4_CLIENT_ID + GA4_CLIENT_SECRET + GA4_REFRESH_TOKEN.' }) };
+      }
+      token = await getRefreshToken(clientId, clientSecret, refreshToken);
+    }
 
     const { startDate = '30daysAgo', endDate = 'today' } = event.queryStringParameters || {};
     const dateRanges = [{ startDate, endDate }];
 
-    // ── BATCH 1: KPIs + Timeline + Pages + Sources + Devices ──────────────────
     const b1 = await batchRun(token, propertyId, [
-      // 0 – KPIs gerais
       { dateRanges, metrics: [
         { name: 'sessions' }, { name: 'totalUsers' }, { name: 'screenPageViews' },
         { name: 'averageSessionDuration' }, { name: 'bounceRate' }, { name: 'newUsers' }
       ]},
-      // 1 – Timeline diária
-      { dateRanges,
-        dimensions: [{ name: 'date' }],
+      { dateRanges, dimensions: [{ name: 'date' }],
         metrics: [{ name: 'sessions' }, { name: 'totalUsers' }, { name: 'screenPageViews' }],
-        orderBys: [{ dimension: { dimensionName: 'date' } }],
-        limit: 90
-      },
-      // 2 – Top páginas
-      { dateRanges,
-        dimensions: [{ name: 'pagePath' }],
+        orderBys: [{ dimension: { dimensionName: 'date' } }], limit: 90 },
+      { dateRanges, dimensions: [{ name: 'pagePath' }],
         metrics: [{ name: 'screenPageViews' }],
-        orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
-        limit: 8
-      },
-      // 3 – Fontes de tráfego
-      { dateRanges,
-        dimensions: [{ name: 'sessionDefaultChannelGroup' }],
+        orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }], limit: 8 },
+      { dateRanges, dimensions: [{ name: 'sessionDefaultChannelGroup' }],
         metrics: [{ name: 'sessions' }],
-        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
-        limit: 8
-      },
-      // 4 – Dispositivos
-      { dateRanges,
-        dimensions: [{ name: 'deviceCategory' }],
-        metrics: [{ name: 'sessions' }]
-      }
+        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }], limit: 8 },
+      { dateRanges, dimensions: [{ name: 'deviceCategory' }], metrics: [{ name: 'sessions' }] }
     ]);
 
-    // ── BATCH 2: Demográficos + Geo + Novos vs Recorrentes ────────────────────
     const b2 = await batchRun(token, propertyId, [
-      // 0 – Gênero
-      { dateRanges, dimensions: [{ name: 'userGender' }], metrics: [{ name: 'totalUsers' }] },
-      // 1 – Faixa etária
-      { dateRanges, dimensions: [{ name: 'userAgeBracket' }], metrics: [{ name: 'totalUsers' }] },
-      // 2 – Estados (região)
-      { dateRanges,
-        dimensions: [{ name: 'region' }],
+      { dateRanges, dimensions: [{ name: 'userGender' }],    metrics: [{ name: 'totalUsers' }] },
+      { dateRanges, dimensions: [{ name: 'userAgeBracket' }],metrics: [{ name: 'totalUsers' }] },
+      { dateRanges, dimensions: [{ name: 'region' }],
         metrics: [{ name: 'sessions' }],
-        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
-        limit: 12
-      },
-      // 3 – Cidades
-      { dateRanges,
-        dimensions: [{ name: 'city' }],
+        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }], limit: 12 },
+      { dateRanges, dimensions: [{ name: 'city' }],
         metrics: [{ name: 'sessions' }],
-        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
-        limit: 10
-      },
-      // 4 – Novos vs Recorrentes
+        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }], limit: 10 },
       { dateRanges, dimensions: [{ name: 'newVsReturning' }], metrics: [{ name: 'sessions' }] }
     ]);
 
-    // ── BATCH 3: Browser + OS + Hora + Dia da semana ─────────────────────────
     const b3 = await batchRun(token, propertyId, [
-      // 0 – Browser
-      { dateRanges,
-        dimensions: [{ name: 'browser' }],
+      { dateRanges, dimensions: [{ name: 'browser' }],
         metrics: [{ name: 'sessions' }],
-        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
-        limit: 8
-      },
-      // 1 – Sistema operacional
-      { dateRanges,
-        dimensions: [{ name: 'operatingSystem' }],
+        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }], limit: 8 },
+      { dateRanges, dimensions: [{ name: 'operatingSystem' }],
         metrics: [{ name: 'sessions' }],
-        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
-        limit: 6
-      },
-      // 2 – Hora do dia (0–23)
-      { dateRanges,
-        dimensions: [{ name: 'hour' }],
+        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }], limit: 6 },
+      { dateRanges, dimensions: [{ name: 'hour' }],
         metrics: [{ name: 'sessions' }],
-        orderBys: [{ dimension: { dimensionName: 'hour' } }],
-        limit: 24
-      },
-      // 3 – Dia da semana (0=Dom … 6=Sáb)
-      { dateRanges,
-        dimensions: [{ name: 'dayOfWeek' }],
+        orderBys: [{ dimension: { dimensionName: 'hour' } }], limit: 24 },
+      { dateRanges, dimensions: [{ name: 'dayOfWeek' }],
         metrics: [{ name: 'sessions' }],
-        orderBys: [{ dimension: { dimensionName: 'dayOfWeek' } }]
-      }
+        orderBys: [{ dimension: { dimensionName: 'dayOfWeek' } }] }
     ]);
 
-    // ── Monta KPIs ─────────────────────────────────────────────────────────────
     const kpiRow = b1.reports?.[0]?.rows?.[0];
     const kpis = {
       sessions:    parseFloat(kpiRow?.metricValues?.[0]?.value || 0),
       users:       parseFloat(kpiRow?.metricValues?.[1]?.value || 0),
       pageViews:   parseFloat(kpiRow?.metricValues?.[2]?.value || 0),
-      avgDuration: parseFloat(kpiRow?.metricValues?.[3]?.value || 0), // segundos
-      bounceRate:  parseFloat(kpiRow?.metricValues?.[4]?.value || 0), // 0–1
+      avgDuration: parseFloat(kpiRow?.metricValues?.[3]?.value || 0),
+      bounceRate:  parseFloat(kpiRow?.metricValues?.[4]?.value || 0),
       newUsers:    parseFloat(kpiRow?.metricValues?.[5]?.value || 0)
     };
 
     return {
       statusCode: 200, headers,
       body: JSON.stringify({
-        status:   'ok',
-        period:   { startDate, endDate },
-        kpis,
+        status: 'ok', period: { startDate, endDate }, kpis,
         timeline:       rows(b1.reports?.[1]),
         pages:          rows(b1.reports?.[2]),
         sources:        rows(b1.reports?.[3]),
@@ -207,11 +191,7 @@ exports.handler = async (event) => {
         weekdays:       rows(b3.reports?.[3])
       })
     };
-
   } catch (err) {
-    return {
-      statusCode: 500, headers,
-      body: JSON.stringify({ status: 'error', message: err.message })
-    };
+    return { statusCode: 500, headers, body: JSON.stringify({ status: 'error', message: err.message }) };
   }
 };
