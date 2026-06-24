@@ -1311,23 +1311,56 @@ async function updateNotifyButton() {
 }
 
 async function subscribePush() {
-  const reg  = await navigator.serviceWorker.ready;
-  const perm = Notification.permission === 'granted'
-    ? 'granted'
-    : await Notification.requestPermission();
-  if (perm !== 'granted') { updateNotifyButton(); return false; }
-
-  const sub  = await reg.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
-  });
+  // Garante que o hash está disponível antes de tentar
   const hash = _passHash || sessionStorage.getItem('pg_hash');
+  if (!hash) {
+    alert('Sessão expirada. Faça login novamente para ativar as notificações.');
+    return false;
+  }
+
+  // Registra / aguarda o Service Worker
+  const reg = await navigator.serviceWorker.register('/sw.js');
+  await navigator.serviceWorker.ready;
+
+  // Pede permissão se ainda não foi dada
+  if (Notification.permission === 'default') {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      alert('Permissão de notificação negada. Habilite nas configurações do navegador.');
+      await updateNotifyButton();
+      return false;
+    }
+  }
+  if (Notification.permission === 'denied') {
+    alert('Notificações bloqueadas. Acesse as configurações do seu navegador/celular e permita notificações para este site.');
+    await updateNotifyButton();
+    return false;
+  }
+
+  // Cria a subscription de push
+  let sub;
+  try {
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC)
+    });
+  } catch (e) {
+    alert('Erro ao criar assinatura push: ' + e.message);
+    return false;
+  }
+
+  // Salva no Supabase via Edge Function (service_role)
   const res  = await fetch(`${SUPA_URL}/functions/v1/popgo-subscribe`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: VALID_EMAIL, passHash: hash, action: 'subscribe', subscription: sub.toJSON() })
   });
-  return res.ok;
+  const data = await res.json();
+  if (!res.ok) {
+    alert('Erro ao salvar assinatura: ' + (data.error || res.status));
+    return false;
+  }
+  return true;
 }
 
 async function toggleNotify() {
@@ -1371,21 +1404,30 @@ function dismissPushBanner() {
 }
 
 async function testPush() {
-  const hash = _passHash || sessionStorage.getItem('pg_hash');
-  const btn  = document.getElementById('btn-test-push');
+  const btn = document.getElementById('btn-test-push');
   if (btn) { btn.textContent = '⏳ Enviando…'; btn.disabled = true; }
   try {
     const res  = await fetch(`${SUPA_URL}/functions/v1/popgo-notify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Notify-Secret': 'popgo-push-2026' },
-      body: JSON.stringify({ nome: 'Teste', cidade: 'Sistema' })
+      body: JSON.stringify({ nome: 'Lead Teste', cidade: 'Sistema', email: 'teste@popgo.com', capital: 'R$ 50k' })
     });
     const data = await res.json();
-    if (btn) { btn.textContent = data.ok ? '✅ Notificação enviada!' : '❌ Erro: ' + (data.error||'?'); }
+    if (!res.ok) throw new Error(data.error || res.status);
+    const subsCount = data.subs ?? 0;
+    const pushed    = (data.push || []).filter(r => r.includes('ok')).length;
+    if (btn) {
+      if (subsCount === 0) {
+        btn.textContent = '⚠️ Sem dispositivos ativos';
+        alert('Nenhum dispositivo inscrito ainda.\n\nClique em "🔔 Ativar notificações" primeiro neste celular/navegador.');
+      } else {
+        btn.textContent = pushed > 0 ? `✅ Enviado (${pushed}/${subsCount})` : '❌ Todos falharam';
+      }
+    }
   } catch(e) {
-    if (btn) btn.textContent = '❌ Falha na conexão';
+    if (btn) btn.textContent = '❌ Erro: ' + e.message;
   }
-  setTimeout(() => { if (btn) { btn.textContent = '🧪 Testar notificação'; btn.disabled = false; } }, 3000);
+  setTimeout(() => { if (btn) { btn.textContent = '🧪 Testar notificação'; btn.disabled = false; } }, 4000);
 }
 
 // Registra SW e inicializa
